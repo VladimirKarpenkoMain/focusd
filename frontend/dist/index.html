@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Focusd</title>
+    <script>
+      // Тема применяется до первого кадра. Источник истины — настройки в Go,
+      // но прочитать их можно только асинхронно, поэтому выбор дублируется в
+      // localStorage: без этого тёмная тема начиналась бы с белой вспышки.
+      (function () {
+        var choice = 'system';
+        try {
+          choice = localStorage.getItem('focusd.theme') || 'system';
+        } catch (e) {
+          /* хранилище может быть недоступно */
+        }
+        var dark =
+          choice === 'dark' ||
+          (choice !== 'light' &&
+            window.matchMedia &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        document.documentElement.dataset.themeChoice = choice;
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-ATyaENkz.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-Ddr2aAvg.css">
+  </head>
+  <body>
+    <div id="app"></div>
+  </body>
+</html>

@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"testing"
@@ -224,11 +227,34 @@ func TestSaveSettingsReportsAutostartError(t *testing.T) {
 	a, _, _, _ := newTestApp(t)
 	sys.SetAutostart = func(context.Context, bool, string) error { return errors.New("schtasks отказал") }
 
-	if err := a.SaveSettings(config.Settings{DefaultDurationMin: 30}); err != nil {
+	if err := a.SaveSettings(config.Settings{Autostart: true, DefaultDurationMin: 30}); err != nil {
 		t.Fatalf("SaveSettings: %v", err)
 	}
 	if a.currentError() == "" {
 		t.Fatal("ошибка автозапуска не показана")
+	}
+}
+
+// Задача планировщика — не то, что нужно переставлять на каждое сохранение:
+// человек, пришедший поменять длительность, не должен ждать schtasks.
+func TestSaveSettingsTouchesAutostartOnlyOnChange(t *testing.T) {
+	a, _, _, _ := newTestApp(t)
+	var called int
+	sys.SetAutostart = func(context.Context, bool, string) error { called++; return nil }
+
+	if err := a.SaveSettings(config.Settings{DefaultDurationMin: 30}); err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+	if called != 0 {
+		t.Fatal("автозапуск переставлен, хотя переключатель не менялся")
+	}
+
+	// А вот настоящее переключение обязано доехать до системы.
+	if err := a.SaveSettings(config.Settings{Autostart: true, DefaultDurationMin: 30}); err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+	if called != 1 {
+		t.Fatalf("автозапуск применён %d раз, ожидался один", called)
 	}
 }
 
@@ -238,7 +264,7 @@ func TestSaveSettingsWithoutExePath(t *testing.T) {
 	sys.ExecutablePath = func() (string, error) { return "", errors.New("путь неизвестен") }
 	sys.SetAutostart = func(context.Context, bool, string) error { called++; return nil }
 
-	if err := a.SaveSettings(config.Settings{DefaultDurationMin: 30}); err != nil {
+	if err := a.SaveSettings(config.Settings{Autostart: true, DefaultDurationMin: 30}); err != nil {
 		t.Fatalf("SaveSettings: %v", err)
 	}
 	if called != 0 {
@@ -275,6 +301,43 @@ func TestSaveSettingsReappliesDuringSession(t *testing.T) {
 	}
 	if len(f.sess.CustomDomains) == 0 {
 		t.Fatal("новые домены не попали в идущую сессию")
+	}
+}
+
+// Повторное применение правил не повод снова проверять прокси живым запросом.
+//
+// Проверка нужна ровно один раз — когда политика прокси прописывается браузерам
+// впервые. В сессии правила меняются на каждое добавление домена и на каждое
+// «Сохранить» в настройках, и каждый раз приложение снова ждало ответа сети: на
+// медленном канале это до восьми секунд (proxySelfTestTimeout), и сохранение
+// выглядело зависшим.
+func TestReapplyDoesNotProbeProxyAgain(t *testing.T) {
+	// Медленный, но живой апстрим: проверка проходит, просто не сразу.
+	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(2 * time.Second)
+		_, _ = io.WriteString(w, "живой сайт")
+	}))
+	t.Cleanup(slow.Close)
+
+	saved := proxyTestURL
+	proxyTestURL = slow.URL
+	t.Cleanup(func() { proxyTestURL = saved })
+
+	a, _, _, f := newTestApp(t, withProxyRunning())
+	f.sess, f.active = softSession(), true
+	if err := a.engage(f.sess); err != nil {
+		t.Fatalf("engage: %v", err)
+	}
+
+	start := time.Now()
+	if err := a.SaveSettings(config.Settings{
+		DefaultDurationMin: 30,
+		CustomDomains:      []string{"example.com"},
+	}); err != nil {
+		t.Fatalf("SaveSettings: %v", err)
+	}
+	if elapsed := time.Since(start); elapsed >= time.Second {
+		t.Fatalf("повторное применение правил снова проверяло прокси: %v", elapsed)
 	}
 }
 

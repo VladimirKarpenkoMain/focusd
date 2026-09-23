@@ -242,6 +242,7 @@ const ru = {
   /* Настройки */
   'settings.title': 'Настройки',
   'settings.close': 'Закрыть настройки',
+  'settings.closeLabel': 'Закрыть',
   'settings.section.look': 'Оформление',
   'settings.section.lookHint': 'Как выглядит окно Focusd',
   'settings.section.widget': 'Компактный таймер',
@@ -512,6 +513,7 @@ const en: Record<Key, string> = {
 
   'settings.title': 'Settings',
   'settings.close': 'Close settings',
+  'settings.closeLabel': 'Close',
   'settings.section.look': 'Appearance',
   'settings.section.lookHint': 'How the Focusd window looks',
   'settings.section.widget': 'Compact timer',
@@ -774,6 +776,7 @@ const zh: Record<Key, string> = {
 
   'settings.title': '设置',
   'settings.close': '关闭设置',
+  'settings.closeLabel': '关闭',
   'settings.section.look': '外观',
   'settings.section.lookHint': 'Focusd 窗口的外观',
   'settings.section.widget': '迷你计时器',

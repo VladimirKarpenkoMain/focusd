@@ -12,7 +12,7 @@
 ![Wails](https://img.shields.io/badge/Wails-v2%20%C2%B7%20WebView2-DF0000)
 ![Languages](https://img.shields.io/badge/UI-Russian%20%C2%B7%20English%20%C2%B7%20Chinese-6E56CF)
 ![Tests](https://img.shields.io/badge/coverage-100%25%20of%20statements-2EA043)
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
 
 Stack: Go 1.25 + Wails v2 (WebView2) + Vite/TypeScript. A single ~10 MB binary, ~35 MB in
 memory, no Electron and no background services.
@@ -321,6 +321,9 @@ Common to both shapes:
   closing the application, not on every mouse movement.
 - **“Keep above all windows” is turned off separately** — with a pin button in the widget itself
   or with a toggle in the settings. The timer is sometimes needed as an ordinary small window too.
+- **The pin works in the ring shape.** The widget's top row sits above the middle part, while that
+  part is stretched over the whole window and comes after it in the markup: without an explicit
+  paint order a click on the pin went into dragging the window instead of the button.
 - Changing the shape applies immediately: there is no point waiting for “Save” and a restart.
 - The mode survives an application restart together with the settings.
 
@@ -334,6 +337,15 @@ measures the rectangles and fails if they intersect again.
 
 The theme, the timer shape and the “Keep above all windows” mode apply immediately, the rest —
 with the “Save” button.
+
+Leaving the panel is signed with a word: a “Close” button. The panel fills the whole window and
+covers the title bar with the window buttons, so a bare cross in the top-right corner read as
+“close the application” rather than “leave the settings”.
+
+“Save” no longer touches what has not changed. The autostart task is rewritten only when the toggle
+is flipped, and the rules of a running session are reapplied only when they really differ. Every
+save used to run `schtasks` and the live proxy check again, and that check waits for a network reply
+for up to eight seconds: the button looked stuck.
 
 ## What Focusd does not do
 

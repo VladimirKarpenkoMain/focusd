@@ -271,7 +271,7 @@ let mState: State = {
     label: '',
   },
   dataDir: 'C:\\Users\\you\\AppData\\Roaming\\Focusd',
-  version: '0.1.0-demo',
+  version: '0.2.0-demo',
   lastError: '',
   notice: '',
   theme: 'system',

@@ -11,7 +11,7 @@
   },
   "info": {
     "productName": "Focusd",
-    "productVersion": "0.1.0",
+    "productVersion": "0.2.0",
     "companyName": "Focusd",
     "comments": "Blocks distracting sites through a local proxy"
   }

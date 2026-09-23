@@ -207,6 +207,18 @@ func main() {
 			reject: []string{"JSERROR", "JSREJECT", "Начать фокус"},
 		},
 		{
+			// Кнопка закрепления обязана получать клики и в круге. Средняя часть
+			// виджета — absolute-блок во всё окно, и в разметке он идёт после
+			// верхней строки: без правильного порядка отрисовки он перекрывал
+			// кнопку, и нажатие уходило в перетаскивание окна.
+			name:     "закрепление в круге получает клики",
+			state:    ringState(stateJSON(settings, "lock")),
+			settings: withField(settings, "widget", true),
+			opts:     pageOpts{probe: "widget-pin"},
+			want:     []string{"WIDGET-PIN-OK"},
+			reject:   []string{"WIDGET-PIN-FAIL", "JSERROR", "JSREJECT"},
+		},
+		{
 			name:     "виджет без сессии",
 			state:    barState(stateJSON(settings, "idle")),
 			settings: withField(settings, "widget", true),
@@ -668,7 +680,7 @@ func stateJSON(settings map[string]any, mode string) map[string]any {
 		"totalRules":    268,
 		"lastBlocked":   "r1---sn-abc.googlevideo.com",
 		"dataDir":       `C:\Users\you\AppData\Local\Focusd`,
-		"version":       "0.1.0",
+		"version":       "0.2.0",
 		"lastError":     "",
 		"theme":         theme,
 		"resolvedTheme": theme,
@@ -1175,6 +1187,45 @@ if (D.probe === 'widget-out') {
       return;
     }
     document.title = 'WIDGET-OK';
+  }, 320);
+}
+
+// Кнопка закрепления в круге. Она живёт в верхней строке виджета, а средняя
+// часть — absolute-блок во всё окно, и в разметке идёт после верхней строки.
+// Без правильного порядка отрисовки она перекрывает кнопку и забирает клик.
+// click() этого не покажет — он срабатывает и по перекрытому элементу, —
+// поэтому бьём hit-тестом в центр кнопки.
+if (D.probe === 'widget-pin') {
+  setTimeout(function () {
+    var btn = document.querySelector('.widget-actions .icon-btn');
+    if (!btn) { document.title = 'WIDGET-PIN-FAIL нет кнопки закрепления'; return; }
+    var r = btn.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) { document.title = 'WIDGET-PIN-FAIL кнопка не отрисована'; return; }
+    var hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    if (!hit || !btn.contains(hit)) {
+      document.title = 'WIDGET-PIN-FAIL кнопка перекрыта: ' +
+        [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)].join(',') +
+        ' -> ' + (hit ? (hit.className || hit.tagName) : 'null');
+      return;
+    }
+    // Самопроверка: если вернуть прежний порядок отрисовки, кнопка обязана
+    // оказаться перекрытой. Иначе проверка выше ничего не значит — она
+    // проходила бы и на мёртвой разметке.
+    var top = document.querySelector('.widget-top');
+    top.style.zIndex = 'auto';
+    var covered = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    top.style.zIndex = '';
+    if (covered && btn.contains(covered)) {
+      document.title = 'WIDGET-PIN-FAIL контроль не сработал: перекрытие не воспроизвелось';
+      return;
+    }
+    var was = D.state.widgetOnTop;
+    btn.click();
+    if (window.__setWidgetOnTop !== !was) {
+      document.title = 'WIDGET-PIN-FAIL клик не сработал: ' + window.__setWidgetOnTop;
+      return;
+    }
+    document.title = 'WIDGET-PIN-OK';
   }, 320);
 }
 

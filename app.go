@@ -23,7 +23,7 @@ import (
 )
 
 // Version — версия приложения, показывается в интерфейсе.
-const Version = "0.1.0"
+const Version = "0.2.0"
 
 // Размеры окна. Виджет — это то же окно в компактном режиме: отдельного окна
 // Wails v2 не умеет, а поднимать ради таймера второй процесс незачем.
@@ -693,12 +693,19 @@ func (a *App) engageProxy(domains, allow []string) (fallback bool, err error) {
 		return true, a.fallbackBrowserBlock(domains, allow)
 	}
 
-	if err := a.prox.SelfTest(proxyTestURL, proxySelfTestTimeout); err != nil {
-		a.engageProxyCheck(false)
-		a.log.Warn("прокси не проходит проверку — включаю политику браузеров", "err", err)
-		return true, a.fallbackBrowserBlock(domains, allow)
+	// Проверка нужна один раз — перед тем, как политика попадёт браузерам.
+	// Если прокси уже прописан и уже водил трафик, повторять её незачем, а
+	// стоит она до восьми секунд (proxySelfTestTimeout): изменения правил
+	// внутри сессии и «Сохранить» в настройках ждали ответа сети и выглядели
+	// зависшими. За тем, что прокси жив, следит сторож — proxyWatchdog.
+	if a.proxyModeNow() != proxyBlocking {
+		if err := a.prox.SelfTest(proxyTestURL, proxySelfTestTimeout); err != nil {
+			a.engageProxyCheck(false)
+			a.log.Warn("прокси не проходит проверку — включаю политику браузеров", "err", err)
+			return true, a.fallbackBrowserBlock(domains, allow)
+		}
+		a.engageProxyCheck(true)
 	}
-	a.engageProxyCheck(true)
 
 	if err := sys.SetBrowserProxy(addr); err != nil {
 		return true, errors.Join(err, a.fallbackBrowserBlock(domains, allow))
@@ -1160,9 +1167,15 @@ func (a *App) SaveSettings(s config.Settings) error {
 		a.resizeWidget()
 	}
 
-	if exe, err := sys.ExecutablePath(); err == nil {
-		if err := sys.SetAutostart(a.ctx, s.Autostart, exe); err != nil {
-			a.setError(fmt.Errorf("автозапуск: %w", err))
+	// Задача планировщика переставляется только тогда, когда переключатель и
+	// правда переключили. Раньше schtasks запускался на каждое «Сохранить» —
+	// человек, пришедший поменять длительность сессии, ждал возни с задачами
+	// планировщика и решал, что кнопка зависла.
+	if s.Autostart != cur.Autostart {
+		if exe, err := sys.ExecutablePath(); err == nil {
+			if err := sys.SetAutostart(a.ctx, s.Autostart, exe); err != nil {
+				a.setError(fmt.Errorf("автозапуск: %w", err))
+			}
 		}
 	}
 

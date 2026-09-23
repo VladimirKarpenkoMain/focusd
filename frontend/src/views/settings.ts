@@ -22,7 +22,6 @@ import {
   card,
   chipsEditor,
   h,
-  iconButton,
   looksLikeDomain,
   normalizeDomain,
   section,
@@ -95,7 +94,14 @@ export function createSettingsView(
 
   const panel = h('div', 'settings-panel');
   const head = h('header', 'settings-head');
-  const closeBtn = iconButton('close', t('settings.close'), onClose);
+  // Выход из настроек подписан словами, а не одним крестиком. Панель занимает
+  // всё окно и закрывает заголовок с кнопками окна, поэтому крестик в правом
+  // верхнем углу оказывался ровно там, где обычно «Закрыть приложение», и
+  // читался как системная кнопка закрытия, а не как «выйти из настроек».
+  const closeBtn = button(t('settings.closeLabel'), onClose, { variant: 'ghost', icon: 'close' });
+  closeBtn.classList.add('btn-compact');
+  closeBtn.setAttribute('aria-label', t('settings.close'));
+  closeBtn.title = t('settings.close');
   head.append(h('h2', undefined, t('settings.title')), closeBtn);
 
   const body = h('div', 'settings-body');
